@@ -55,9 +55,10 @@ class WidgetsList extends StatelessWidget {
       case WidgetType.text:
         return TextWidget(
           controller: controller!,
-          onTapOutside: (val) {
+          onTapOutside: (text, style) {
             widgetModel = widgetModel.copyWith(properties: {
-              "text": val,
+              "text": text,
+              "style": style,
             });
             context.read<BlogConstructBloc>().add(
                   WidgetChanged(widget: widgetModel),
@@ -65,7 +66,16 @@ class WidgetsList extends StatelessWidget {
           },
         );
       case WidgetType.image:
-        return const ImageWidget();
+        return ImageWidget(
+          onPicked: (image) {
+            widgetModel = widgetModel.copyWith(properties: {
+              "image": image,
+            });
+            context.read<BlogConstructBloc>().add(
+                  WidgetChanged(widget: widgetModel),
+                );
+          },
+        );
       case WidgetType.video:
       case WidgetType.code:
         return const CodeWidget();
