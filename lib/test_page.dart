@@ -66,20 +66,18 @@ class _TestPageState extends State<TestPage> {
                     padding: const EdgeInsets.symmetric(vertical: 15),
                     child: WidgetWrapper(
                       onClose: () {
-                        // int controllerIndex = -1;
-                        // for (int k = 0; k < widgets.length; k++) {
-                        //   final widget = widgets[k];
-                        //   if (widget.type == WidgetType.text) controllerIndex++;
-                        //   if (widget.id == widget.id) {
-                        //     widgets.removeAt(k);
-                        //     if (widget.type == WidgetType.text) {
-                        //       controllers.removeAt(controllerIndex);
-                        //     }
-                        //     break;
-                        //   }
-                        // }
-                        widgets.removeAt(i);
-                        controllers.removeAt(i);
+                        int controllerIndex = -1;
+                        for (int k = 0; k < widgets.length; k++) {
+                          final current = widgets[k];
+                          if (current.type == WidgetType.text) controllerIndex++;
+                          if (current.id == widgetModel.id) {
+                            widgets.removeAt(k);
+                            if (current.type == WidgetType.text) {
+                              controllers.removeAt(controllerIndex);
+                            }
+                            break;
+                          }
+                        }
                         setState(() {});
                       },
                       child: getWidget(

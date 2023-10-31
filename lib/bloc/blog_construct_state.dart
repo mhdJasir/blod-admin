@@ -14,3 +14,7 @@ class BlogConstructInitial extends BlogConstructState {
 class BlogContentChanged extends BlogConstructState {
   const BlogContentChanged({required super.widgets, required super.controllers});
 }
+
+class NonUpdateChange extends BlogConstructState {
+  const NonUpdateChange({required super.widgets, required super.controllers});
+}

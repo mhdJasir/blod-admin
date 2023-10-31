@@ -1,7 +1,6 @@
 import 'package:blog/bloc/blog_construct_bloc.dart';
 import 'package:blog/bloc/theme_cubit.dart';
 import 'package:blog/pages/construction_page/home_page.dart';
-import 'package:blog/test_page.dart';
 import 'package:blog/widgets/side_nav.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -47,10 +46,6 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: TestPage(),
-    );
     return MultiBlocProvider(
       providers: [
         BlocProvider(create: (_) => AppTheme()),

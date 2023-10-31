@@ -12,6 +12,7 @@ class WidgetsList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<BlogConstructBloc, BlogConstructState>(
+      buildWhen: (oldState, state) => state is! NonUpdateChange,
       builder: (context, state) {
         return ListView.builder(
           itemCount: state.widgets.length,
