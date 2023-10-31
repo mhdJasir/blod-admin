@@ -1,5 +1,6 @@
 import 'package:blog/bloc/blog_construct_bloc.dart';
 import 'package:blog/model/widget_model.dart';
+import 'package:blog/pages/construction_page/widgets/code_widget.dart';
 import 'package:blog/pages/construction_page/widgets/image_widget.dart';
 import 'package:blog/pages/construction_page/widgets/text_widget.dart';
 import 'package:blog/pages/construction_page/widgets/widget_wrapper.dart';
@@ -67,6 +68,7 @@ class WidgetsList extends StatelessWidget {
         return const ImageWidget();
       case WidgetType.video:
       case WidgetType.code:
+        return const CodeWidget();
       case WidgetType.images:
       default:
         return Container();
