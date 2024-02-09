@@ -15,7 +15,8 @@ dependencies:
   flutter_bloc:
   image_picker: ^1.0.4
   flutter_highlighting: ^0.9.0+11.8.0
-  connectivity_plus: ^5.0.2
+  dropdown_button2: ^2.3.9
+  file_picker: ^6.0.0
 
 dev_dependencies:
   flutter_test:
