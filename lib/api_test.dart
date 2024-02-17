@@ -32,14 +32,11 @@ class _ApiTestState extends State<ApiTest> {
             MaterialButton(
               onPressed: () async {
                 final request = ApiRequest(
-                  // url: "http://3.27.134.239:3000/api/getCategories",
-                  apiType: ApiType.custom,
-                  customFutureOperation: ApiCallHelper.getApi(
-                    path: "http://3.27.134.239:3000/api/getCategories",
-                  ),
+                  url: "http://3.27.134.239:3000/api/getDistricts",
+                  apiType: ApiType.get,
                 );
                 final request2 = ApiRequest(
-                  url: "http://3.27.134.239:3000/api/getDistricts",
+                  url: "http://3.27.134.239:3000/api/getCategories",
                   apiType: ApiType.get,
                 );
                 apiManager.addNewRequest(request).listen((event) {
