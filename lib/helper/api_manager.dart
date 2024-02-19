@@ -9,32 +9,7 @@ import 'package:http/http.dart' as http;
 class ApiManager {
   ApiManager() {
     manageConnectivity();
-    _requestController.stream.listen(
-      (event) async {
-        switch (event.apiType) {
-          case ApiType.get:
-            final response = await event.get();
-            final responseController = _requestResponseMap[event];
-            if (responseController != null) {
-              if (response.apiStatus != ApiStatus.notConnected) {
-                _removeCompleted(event);
-                responseController.add(response);
-              }
-            }
-          case ApiType.custom:
-            if (event.customFutureOperation == null) break;
-            final data = await event.customFutureOperation;
-            final responseController = _requestResponseMap[event];
-            if (responseController != null) {
-              if (data.apiStatus != ApiStatus.notConnected) {
-                _removeCompleted(event);
-                responseController.add(ApiResponse(data: data));
-              }
-            }
-          default:
-        }
-      },
-    );
+    _requestController.stream.listen(onNewRequest);
   }
 
   final _requestController = StreamController<ApiRequest>();
@@ -44,12 +19,48 @@ class ApiManager {
   final _connectivity = Connectivity();
   bool isConnected = false;
 
+  Future<void> onNewRequest(ApiRequest request) async {
+    final hasConnection = await checkConnection();
+    await Future.delayed(const Duration(seconds: 2));
+    if (!hasConnection) return;
+    switch (request.apiType) {
+      case ApiType.get:
+        final response = await request.get();
+        final responseController = _requestResponseMap[request];
+        if (responseController != null) {
+          if (response.apiStatus != ApiStatus.notConnected) {
+            _removeCompleted(request);
+            responseController.add(response);
+          }
+        }
+      case ApiType.custom:
+        if (request.customFutureOperation == null) break;
+        final data = await request.customFutureOperation;
+        final responseController = _requestResponseMap[request];
+        if (responseController != null) {
+          try {
+            responseController.add(ApiResponse(
+              data: data,
+              apiStatus: ApiStatus.success,
+            ));
+          } catch (e) {
+            responseController.add(ApiResponse(
+              data: e,
+              apiStatus: ApiStatus.error,
+            ));
+          }
+          _removeCompleted(request);
+        }
+      default:
+    }
+  }
+
   void manageConnectivity() async {
     final connectivityResult = await _connectivity.checkConnectivity();
     setConnection(connectivityResult);
     _connectivitySubscription = _connectivity.onConnectivityChanged.listen(
       (ConnectivityResult result) async {
-        setConnection(result);
+        await setConnection(result);
         await Future.delayed(const Duration(milliseconds: 100));
         if (isConnected) {
           for (var i = 0; i < _apiQueue.length; i++) {
@@ -60,12 +71,25 @@ class ApiManager {
     );
   }
 
-  void setConnection(ConnectivityResult connectivityResult) {
+  Future<bool> checkConnection() async {
+    try {
+      final result = await InternetAddress.lookup('google.com');
+      if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
+        return true;
+      } else {
+        return false;
+      }
+    } on SocketException catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> setConnection(ConnectivityResult connectivityResult) async {
     switch (connectivityResult) {
       case ConnectivityResult.wifi:
       case ConnectivityResult.mobile:
       case ConnectivityResult.ethernet:
-        isConnected = true;
+        await setIsConnected();
         break;
       case ConnectivityResult.none:
       case ConnectivityResult.bluetooth:
@@ -73,6 +97,13 @@ class ApiManager {
         isConnected = false;
         break;
     }
+  }
+
+  Future<bool> setIsConnected() async {
+    final connected = await checkConnection();
+    isConnected = connected;
+    if (!connected) await setIsConnected();
+    return connected;
   }
 
   Stream<ApiResponse?> addNewRequest(ApiRequest request) {
@@ -100,13 +131,15 @@ class ApiManager {
     }
   }
 
-  _removeCompleted(ApiRequest request) {
+  _removeCompleted(ApiRequest request) async {
     if (_apiQueue.isEmpty) return;
+    final controller = _requestResponseMap[request];
+    await controller?.close();
+    _requestResponseMap.remove(request);
     _apiQueue.removeWhere((element) => element.url == request.url);
   }
 
   void close() {
-    _requestController.close();
     _requestController.close();
     _connectivitySubscription.cancel();
   }
@@ -160,6 +193,35 @@ class ApiRequest {
   Future<ApiResponse> get() async {
     try {
       final response = await http.get(Uri.parse(url ?? ""));
+      final json = tryDecode(response.body);
+      if (response.statusCode == 200 && json != null) {
+        return ApiResponse(
+          data: json,
+          apiStatus: ApiStatus.success,
+        );
+      }
+      return ApiResponse(
+        apiStatus: ApiStatus.error,
+        error: "Something went wrong",
+      );
+    } on TimeoutException catch (_) {
+      return ApiResponse(
+        apiStatus: ApiStatus.error,
+        error: "Timeout!!, please try again later",
+      );
+    } on SocketException catch (_) {
+      return ApiResponse(
+        apiStatus: ApiStatus.notConnected,
+        error: "Not Connected!, please connect to a network",
+      );
+    }
+  }
+
+  Future<ApiResponse> post() async {
+    try {
+      final response = await http.post(
+        Uri.parse(url ?? ""),
+      );
       final json = tryDecode(response.body);
       if (response.statusCode == 200 && json != null) {
         return ApiResponse(

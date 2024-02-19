@@ -22,22 +22,29 @@ class _ApiTestState extends State<ApiTest> {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Text(
-              (response?.data ?? "").toString(),
-              style: const TextStyle(
-                fontSize: 20,
-                color: Colors.green,
-              ),
-            ),
+            response?.data == null
+                ? Container()
+                : ListView.builder(
+                    itemCount: (response?.data['data'] ?? []).length,
+                    shrinkWrap: true,
+                    itemBuilder: (c, i) {
+                      final map = (response?.data['data'] ?? [])[i];
+                      return buildPlace(map);
+                    },
+                  ),
             MaterialButton(
               onPressed: () async {
                 final request = ApiRequest(
-                  url: "http://3.27.134.239:3000/api/getDistricts",
-                  apiType: ApiType.get,
+                  apiType: ApiType.custom,
+                  customFutureOperation: ApiCallHelper.getApi(
+                    path: "http://3.27.134.239:3000/api/getDistricts",
+                  ),
                 );
                 final request2 = ApiRequest(
-                  url: "http://3.27.134.239:3000/api/getCategories",
-                  apiType: ApiType.get,
+                  apiType: ApiType.custom,
+                  customFutureOperation: ApiCallHelper.getApi(
+                    path: "http://3.27.134.239:3000/api/getCategories",
+                  ),
                 );
                 apiManager.addNewRequest(request).listen((event) {
                   if (event != null) {
@@ -45,26 +52,48 @@ class _ApiTestState extends State<ApiTest> {
                     setState(() {});
                   }
                 });
-                apiManager.addNewRequest(request2).listen((event) {
-                  if (event != null) {
-                    response2 = event;
-                    setState(() {});
-                  }
-                });
+                // apiManager.addNewRequest(request2).listen((event) {
+                //   if (event != null) {
+                //     response2 = event;
+                //     setState(() {});
+                //   }
+                // });
               },
               height: 50,
               child: const Text("Start Call"),
             ),
-            Text(
-              (response2?.data ?? "").toString(),
-              style: const TextStyle(
-                fontSize: 20,
-                color: Colors.green,
-              ),
-            ),
+            response2?.data == null
+                ? Container()
+                : ListView.builder(
+                    itemCount: (response2?.data['data'] ?? []).length,
+                    shrinkWrap: true,
+                    itemBuilder: (c, i) {
+                      final map = (response2?.data['data'] ?? [])[i];
+                      return buildPlace(map);
+                    },
+                  ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget buildPlace(Map<String, dynamic> map) {
+    return Column(
+      children: [
+        Text(
+          map['name'],
+          style: const TextStyle(
+            fontSize: 20,
+            color: Colors.green,
+          ),
+        ),
+        Image.network(
+          map['image'],
+          height: 200,
+          width: 200,
+        ),
+      ],
     );
   }
 }
