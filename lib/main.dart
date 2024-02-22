@@ -1,3 +1,4 @@
+import 'package:blog/api_test.dart';
 import 'package:blog/bloc/blog_construct_bloc.dart';
 import 'package:blog/bloc/theme_cubit.dart';
 import 'package:blog/pages/construction_page/home_page.dart';
@@ -7,9 +8,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey =
-    GlobalKey<NavigatorState>(debugLabel: 'root');
+GlobalKey<NavigatorState>(debugLabel: 'root');
 final GlobalKey<NavigatorState> _shellNavigatorKey =
-    GlobalKey<NavigatorState>(debugLabel: 'shell');
+GlobalKey<NavigatorState>(debugLabel: 'shell');
 
 void main() {
   runApp(const MyApp());
@@ -53,6 +54,10 @@ class _MyAppState extends State<MyApp> {
       ],
       child: BlocBuilder<AppTheme, ThemeMode>(
         builder: (context, state) {
+          return const MaterialApp(
+            debugShowCheckedModeBanner: false,
+            home: ApiTest(),
+          );
           return MaterialApp.router(
             title: 'Blog-Admin',
             themeMode: state,
