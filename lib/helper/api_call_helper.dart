@@ -22,6 +22,7 @@ class ApiCallHelper {
       var headers = {
         HttpHeaders.contentTypeHeader: 'application/json',
       };
+      print(uri);
       final response = await http.get(uri, headers: headers);
       final bool isOnSession = isSessionActive(response);
       if (!isOnSession) {
@@ -29,6 +30,7 @@ class ApiCallHelper {
       }
       return tryDecode(response.body);
     } on SocketException catch (_) {
+      print('ApiCallHelper.getApi Socket Exception');
       rethrow;
     } catch (e) {
       print("Error   : $e");

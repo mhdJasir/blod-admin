@@ -24,28 +24,24 @@ class _ApiTestState extends State<ApiTest> {
           children: [
             response?.data == null
                 ? Container()
-                : ListView.builder(
-                    itemCount: (response?.data['data'] ?? []).length,
-                    shrinkWrap: true,
-                    itemBuilder: (c, i) {
-                      final map = (response?.data['data'] ?? [])[i];
-                      return buildPlace(map);
-                    },
-                  ),
+                // : ListView.builder(
+                //     itemCount: (response?.data['data'] ?? []).length,
+                //     shrinkWrap: true,
+                //     itemBuilder: (c, i) {
+                //       final map = (response?.data['data'] ?? [])[i];
+                //       return buildPlace(map);
+                //     },
+                //   ),
+             :Text(response!.data.toString()),
             MaterialButton(
               onPressed: () async {
                 final request = ApiRequest(
                   apiType: ApiType.custom,
-                  customFutureOperation: ApiCallHelper.getApi(
-                    path: "http://3.27.134.239:3000/api/getDistricts",
+                  customFutureOperation: ()=>ApiCallHelper.getApi(
+                    path: "https://wordsapiv1.p.rapidapi.com/words/hatchback/typeOf",
                   ),
                 );
-                final request2 = ApiRequest(
-                  apiType: ApiType.custom,
-                  customFutureOperation: ApiCallHelper.getApi(
-                    path: "http://3.27.134.239:3000/api/getCategories",
-                  ),
-                );
+
                 apiManager.addNewRequest(request).listen((event) {
                   if (event != null) {
                     response = event;

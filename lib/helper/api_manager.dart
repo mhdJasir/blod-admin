@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -20,9 +19,6 @@ class ApiManager {
   bool isConnected = false;
 
   Future<void> onNewRequest(ApiRequest request) async {
-    final hasConnection = await checkConnection();
-    await Future.delayed(const Duration(seconds: 2));
-    if (!hasConnection) return;
     switch (request.apiType) {
       case ApiType.get:
         final response = await request.get();
@@ -35,21 +31,23 @@ class ApiManager {
         }
       case ApiType.custom:
         if (request.customFutureOperation == null) break;
-        final data = await request.customFutureOperation;
         final responseController = _requestResponseMap[request];
-        if (responseController != null) {
+        if (responseController != null && !responseController.isClosed) {
           try {
+            final data = await request.customFutureOperation?.call();
             responseController.add(ApiResponse(
               data: data,
               apiStatus: ApiStatus.success,
             ));
+            _removeCompleted(request);
           } catch (e) {
-            responseController.add(ApiResponse(
-              data: e,
-              apiStatus: ApiStatus.error,
-            ));
+            responseController.add(
+              ApiResponse(
+                data: e,
+                apiStatus: ApiStatus.error,
+              ),
+            );
           }
-          _removeCompleted(request);
         }
       default:
     }
@@ -61,11 +59,12 @@ class ApiManager {
     _connectivitySubscription = _connectivity.onConnectivityChanged.listen(
       (ConnectivityResult result) async {
         await setConnection(result);
-        await Future.delayed(const Duration(milliseconds: 100));
-        if (isConnected) {
-          for (var i = 0; i < _apiQueue.length; i++) {
-            _requestController.add(_apiQueue.elementAt(i));
-          }
+        final isConnected = await checkConnection();
+        if (!isConnected) {
+          return manageConnectivity();
+        }
+        for (var i = 0; i < _apiQueue.length; i++) {
+          _requestController.add(_apiQueue[i]);
         }
       },
     );
@@ -108,9 +107,9 @@ class ApiManager {
 
   Stream<ApiResponse?> addNewRequest(ApiRequest request) {
     final responseController = StreamController<ApiResponse>.broadcast();
+    request = request.setKey();
     _requestResponseMap[request] = responseController;
     _apiQueue.add(request);
-    request.setKey();
     _nextApi();
     return responseController.stream;
   }
@@ -136,7 +135,7 @@ class ApiManager {
     final controller = _requestResponseMap[request];
     await controller?.close();
     _requestResponseMap.remove(request);
-    _apiQueue.removeWhere((element) => element.url == request.url);
+    _apiQueue.removeWhere((element) => element.id == request.id);
   }
 
   void close() {
@@ -145,13 +144,11 @@ class ApiManager {
   }
 }
 
-typedef FutureCallback = Future<dynamic> Function();
-
 class ApiRequest {
   final int? id;
   final String? url;
   final ApiType apiType;
-  final Future? customFutureOperation;
+  final Future Function()? customFutureOperation;
   final Map<String, dynamic>? body;
   final Map<String, dynamic>? headers;
   final ApiRequestStatus? status;
@@ -188,6 +185,18 @@ class ApiRequest {
       url: url,
       id: UniqueKey().hashCode,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      "url": url,
+      "body": body,
+      "customFutureOperation": customFutureOperation,
+      "status": status,
+      "apiType": apiType,
+      "headers": headers,
+      "id": id,
+    };
   }
 
   Future<ApiResponse> get() async {
@@ -253,6 +262,14 @@ class ApiRequest {
       return null;
     }
   }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ApiRequest && id == other.id;
+  }
+
+  @override
+  int get hashCode => id.hashCode;
 }
 
 class ApiResponse {
