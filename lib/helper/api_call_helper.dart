@@ -24,6 +24,7 @@ class ApiCallHelper {
       };
       print(uri);
       final response = await http.get(uri, headers: headers);
+      print(response.body);
       final bool isOnSession = isSessionActive(response);
       if (!isOnSession) {
         return null;

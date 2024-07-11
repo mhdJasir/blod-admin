@@ -1,6 +1,12 @@
+import 'dart:isolate';
+import 'dart:ui';
+
 import 'package:blog/helper/api_call_helper.dart';
 import 'package:blog/helper/api_manager.dart';
+import 'package:blog/widgets/overlay_drop_down.dart';
 import 'package:flutter/material.dart';
+
+ValueNotifier<BuildContext?> appContext = ValueNotifier<BuildContext?>(null);
 
 class ApiTest extends StatefulWidget {
   const ApiTest({super.key});
@@ -15,6 +21,25 @@ class _ApiTestState extends State<ApiTest> {
   final apiManager = ApiManager();
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
+      appContext.value = context;
+    });
+  }
+
+  String? day;
+  List<String> days = [
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+  ];
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Center(
@@ -22,52 +47,59 @@ class _ApiTestState extends State<ApiTest> {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            response?.data == null
-                ? Container()
-                // : ListView.builder(
-                //     itemCount: (response?.data['data'] ?? []).length,
-                //     shrinkWrap: true,
-                //     itemBuilder: (c, i) {
-                //       final map = (response?.data['data'] ?? [])[i];
-                //       return buildPlace(map);
-                //     },
-                //   ),
-             :Text(response!.data.toString()),
-            MaterialButton(
-              onPressed: () async {
-                final request = ApiRequest(
-                  apiType: ApiType.custom,
-                  customFutureOperation: ()=>ApiCallHelper.getApi(
-                    path: "https://wordsapiv1.p.rapidapi.com/words/hatchback/typeOf",
-                  ),
-                );
-
-                apiManager.addNewRequest(request).listen((event) {
-                  if (event != null) {
-                    response = event;
-                    setState(() {});
-                  }
-                });
-                // apiManager.addNewRequest(request2).listen((event) {
-                //   if (event != null) {
-                //     response2 = event;
-                //     setState(() {});
-                //   }
-                // });
-              },
-              height: 50,
-              child: const Text("Start Call"),
+            // response?.data == null
+            //     ? Container()
+            //     // : ListView.builder(
+            //     //     itemCount: (response?.data['data'] ?? []).length,
+            //     //     shrinkWrap: true,
+            //     //     itemBuilder: (c, i) {
+            //     //       final map = (response?.data['data'] ?? [])[i];
+            //     //       return buildPlace(map);
+            //     //     },
+            //     //   ),
+            //     : Text(response!.data.toString()),
+            // MaterialButton(
+            //   onPressed: () async {
+            //     final request = ApiRequest(
+            //       apiType: ApiType.custom,
+            //       customFutureOperation: () => ApiCallHelper.getApi(
+            //         path:
+            //             "https://wordsapiv1.p.rapidapi.com/words/hatchback/typeOf",
+            //       ),
+            //     );
+            //
+            //     apiManager.addNewRequest(request).listen((event) {
+            //       if (event != null) {
+            //         response = event;
+            //         setState(() {});
+            //       }
+            //     });
+            //   },
+            //   height: 50,
+            //   child: const Text("Start Call"),
+            // ),
+            // response2?.data == null
+            //     ? Container()
+            //     : ListView.builder(
+            //         itemCount: (response2?.data['data'] ?? []).length,
+            //         shrinkWrap: true,
+            //         itemBuilder: (c, i) {
+            //           final map = (response2?.data['data'] ?? [])[i];
+            //           return buildPlace(map);
+            //         },
+            //       ),
+            SizedBox(
+              width: 200,
+              child: OverlayDropdown(
+                onChange: (val, index) {
+                  day = val;
+                  setState(() {});
+                },
+                items: days
+                    .map((e) => DropdownItem(value: e, child: Text(e)))
+                    .toList(),
+              ),
             ),
-            response2?.data == null
-                ? Container()
-                : ListView.builder(
-                    itemCount: (response2?.data['data'] ?? []).length,
-                    shrinkWrap: true,
-                    itemBuilder: (c, i) {
-                      final map = (response2?.data['data'] ?? [])[i];
-                      return buildPlace(map);
-                    },
-                  ),
           ],
         ),
       ),

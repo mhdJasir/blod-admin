@@ -1,8 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 class ApiManager {
@@ -34,12 +35,11 @@ class ApiManager {
         final responseController = _requestResponseMap[request];
         if (responseController != null && !responseController.isClosed) {
           try {
-            final data = await request.customFutureOperation?.call();
-            responseController.add(ApiResponse(
-              data: data,
-              apiStatus: ApiStatus.success,
-            ));
-            _removeCompleted(request);
+            // compute((_)=>_fetchDataIsolate(""),"HGFD").then((value) {
+            //   // responseController.add(value);
+            //   _removeCompleted(request);
+            // });
+            _fetchDataIsolate("");
           } catch (e) {
             responseController.add(
               ApiResponse(
@@ -51,6 +51,28 @@ class ApiManager {
         }
       default:
     }
+  }
+  Future<void> _fetchDataIsolate(String request) async {
+    final receivePort = ReceivePort();
+    print('ApiManager._fetchDataIsolate');
+
+    await Isolate.spawn(doTheFutureCall, [receivePort.sendPort, request]);
+
+    // Receiving the result from the spawned isolate
+    final result = await receivePort.first as String;
+    print(result);
+  }
+
+  void doTheFutureCall(List<dynamic> args) async {
+    final sendPort = args[0] as SendPort;
+    final request = args[1] as String;
+    print('ApiManager.doTheFutureCall');
+
+    // Performing the operation
+    final data = "$request Jasir";
+
+    // Sending the result back to the main isolate
+    sendPort.send(data);
   }
 
   void manageConnectivity() async {
@@ -79,6 +101,8 @@ class ApiManager {
         return false;
       }
     } on SocketException catch (_) {
+      return false;
+    } catch(e){
       return false;
     }
   }
@@ -117,7 +141,7 @@ class ApiManager {
   _nextApi() {
     if (_apiQueue.isEmpty) return;
     try {
-      for (var i = 0; i < _apiQueue.toList().length; ++i) {
+      for (var i = 0; i < _apiQueue.length; ++i) {
         var api = _apiQueue[i];
         if (api.status == ApiRequestStatus.pending) {
           _requestController.add(api);
@@ -202,35 +226,6 @@ class ApiRequest {
   Future<ApiResponse> get() async {
     try {
       final response = await http.get(Uri.parse(url ?? ""));
-      final json = tryDecode(response.body);
-      if (response.statusCode == 200 && json != null) {
-        return ApiResponse(
-          data: json,
-          apiStatus: ApiStatus.success,
-        );
-      }
-      return ApiResponse(
-        apiStatus: ApiStatus.error,
-        error: "Something went wrong",
-      );
-    } on TimeoutException catch (_) {
-      return ApiResponse(
-        apiStatus: ApiStatus.error,
-        error: "Timeout!!, please try again later",
-      );
-    } on SocketException catch (_) {
-      return ApiResponse(
-        apiStatus: ApiStatus.notConnected,
-        error: "Not Connected!, please connect to a network",
-      );
-    }
-  }
-
-  Future<ApiResponse> post() async {
-    try {
-      final response = await http.post(
-        Uri.parse(url ?? ""),
-      );
       final json = tryDecode(response.body);
       if (response.statusCode == 200 && json != null) {
         return ApiResponse(

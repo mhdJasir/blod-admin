@@ -8,11 +8,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey =
-GlobalKey<NavigatorState>(debugLabel: 'root');
+    GlobalKey<NavigatorState>(debugLabel: 'root');
 final GlobalKey<NavigatorState> _shellNavigatorKey =
-GlobalKey<NavigatorState>(debugLabel: 'shell');
+    GlobalKey<NavigatorState>(debugLabel: 'shell');
 
-void main() {
+Future<void> main() async {
   runApp(const MyApp());
 }
 
@@ -47,6 +47,10 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: ApiTest(),
+    );
     return MultiBlocProvider(
       providers: [
         BlocProvider(create: (_) => AppTheme()),
@@ -54,10 +58,6 @@ class _MyAppState extends State<MyApp> {
       ],
       child: BlocBuilder<AppTheme, ThemeMode>(
         builder: (context, state) {
-          return const MaterialApp(
-            debugShowCheckedModeBanner: false,
-            home: ApiTest(),
-          );
           return MaterialApp.router(
             title: 'Blog-Admin',
             themeMode: state,
