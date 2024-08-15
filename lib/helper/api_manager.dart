@@ -7,6 +7,8 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 
 class ApiManager {
+  int maxConcurrentRequests = 10;
+
   ApiManager() {
     manageConnectivity();
     _requestController.stream.listen(onNewRequest);
@@ -14,15 +16,27 @@ class ApiManager {
 
   final _requestController = StreamController<ApiRequest>();
   final _requestResponseMap = <ApiRequest, StreamController<ApiResponse>>{};
-  late StreamSubscription<ConnectivityResult> _connectivitySubscription;
   final List<ApiRequest> _apiQueue = <ApiRequest>[];
+  final Map<int, Completer<void>> _completerMap = {};
+  late StreamSubscription<ConnectivityResult> _connectivitySubscription;
   final _connectivity = Connectivity();
   bool isConnected = false;
 
   Future<void> onNewRequest(ApiRequest request) async {
     final responseController = _requestResponseMap[request];
+    final requestCompleter = _completerMap[request.id];
     if (responseController != null && !responseController.isClosed) {
       try {
+        if (requestCompleter!.isCompleted) {
+          responseController.add(
+            ApiResponse(
+              apiStatus: ApiStatus.error,
+              error: "Request Cancelled",
+            ),
+          );
+          _removeCompleted(request);
+          return;
+        }
         final data = await request.customFutureOperation!.call();
         responseController.add(
           ApiResponse(
@@ -55,11 +69,11 @@ class ApiManager {
     );
   }
 
-  int _recursiveCount = 0;
+  int _recursiveCall = 0;
 
   Future<void> onConnectionActive() async {
-    if (!isConnected || (_recursiveCount == 10)) return;
-    _recursiveCount += 1;
+    if (!isConnected || (_recursiveCall == 10)) return;
+    _recursiveCall += 1;
     final haveInternet = await checkConnection();
     if (!haveInternet) return onConnectionActive();
     for (var i = 0; i < _apiQueue.length; i++) {
@@ -71,8 +85,7 @@ class ApiManager {
     try {
       final result = await InternetAddress.lookup('google.com');
       final hasAccess = result.isNotEmpty && result[0].rawAddress.isNotEmpty;
-      if (hasAccess) return true;
-      return false;
+      return hasAccess;
     } on SocketException catch (_) {
       return false;
     } catch (e) {
@@ -98,6 +111,7 @@ class ApiManager {
   Stream<ApiResponse?> addNewRequest(ApiRequest request) {
     final responseController = StreamController<ApiResponse>.broadcast();
     request = request.setKey();
+    _completerMap[request.id!] = Completer<void>();
     _requestResponseMap[request] = responseController;
     _apiQueue.add(request);
     _nextApi();
@@ -116,7 +130,7 @@ class ApiManager {
         }
       }
     } catch (e) {
-      print(e);
+      log(e.toString());
     }
   }
 
@@ -125,16 +139,21 @@ class ApiManager {
     final controller = _requestResponseMap[request];
     await controller?.close();
     _requestResponseMap.remove(request);
+    _completerMap.remove(request.id);
     _apiQueue.removeWhere((element) => element.id == request.id);
   }
 
   void cancelRequest(ApiRequest request) {
-    _apiQueue.remove(request);
-    final controller = _requestResponseMap[request];
-    controller?.close();
-    _requestResponseMap.remove(request);
+    final requestCompleter = _completerMap[request.id];
+    if (requestCompleter != null && !requestCompleter.isCompleted) {
+      requestCompleter.completeError("Request Cancelled");
+      _completerMap.remove(request.id);
+      _apiQueue.remove(request);
+      final controller = _requestResponseMap[request];
+      controller?.close();
+      _requestResponseMap.remove(request);
+    }
   }
-
 
   void close() {
     _requestController.close();
