@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer';
 import 'dart:io';
-import 'dart:isolate';
+
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 
 class ApiManager {
   ApiManager() {
@@ -20,59 +20,27 @@ class ApiManager {
   bool isConnected = false;
 
   Future<void> onNewRequest(ApiRequest request) async {
-    switch (request.apiType) {
-      case ApiType.get:
-        final response = await request.get();
-        final responseController = _requestResponseMap[request];
-        if (responseController != null) {
-          if (response.apiStatus != ApiStatus.notConnected) {
-            _removeCompleted(request);
-            responseController.add(response);
-          }
-        }
-      case ApiType.custom:
-        if (request.customFutureOperation == null) break;
-        final responseController = _requestResponseMap[request];
-        if (responseController != null && !responseController.isClosed) {
-          try {
-            // compute((_)=>_fetchDataIsolate(""),"HGFD").then((value) {
-            //   // responseController.add(value);
-            //   _removeCompleted(request);
-            // });
-            _fetchDataIsolate("");
-          } catch (e) {
-            responseController.add(
-              ApiResponse(
-                data: e,
-                apiStatus: ApiStatus.error,
-              ),
-            );
-          }
-        }
-      default:
+    final responseController = _requestResponseMap[request];
+    if (responseController != null && !responseController.isClosed) {
+      try {
+        final data = await request.customFutureOperation!.call();
+        responseController.add(
+          ApiResponse(
+            data: data,
+            apiStatus: ApiStatus.success,
+          ),
+        );
+        _removeCompleted(request);
+      } catch (e) {
+        responseController.add(
+          ApiResponse(
+            data: e,
+            error: e.toString(),
+            apiStatus: ApiStatus.error,
+          ),
+        );
+      }
     }
-  }
-  Future<void> _fetchDataIsolate(String request) async {
-    final receivePort = ReceivePort();
-    print('ApiManager._fetchDataIsolate');
-
-    await Isolate.spawn(doTheFutureCall, [receivePort.sendPort, request]);
-
-    // Receiving the result from the spawned isolate
-    final result = await receivePort.first as String;
-    print(result);
-  }
-
-  void doTheFutureCall(List<dynamic> args) async {
-    final sendPort = args[0] as SendPort;
-    final request = args[1] as String;
-    print('ApiManager.doTheFutureCall');
-
-    // Performing the operation
-    final data = "$request Jasir";
-
-    // Sending the result back to the main isolate
-    sendPort.send(data);
   }
 
   void manageConnectivity() async {
@@ -80,39 +48,44 @@ class ApiManager {
     setConnection(connectivityResult);
     _connectivitySubscription = _connectivity.onConnectivityChanged.listen(
       (ConnectivityResult result) async {
-        await setConnection(result);
-        final isConnected = await checkConnection();
-        if (!isConnected) {
-          return manageConnectivity();
-        }
-        for (var i = 0; i < _apiQueue.length; i++) {
-          _requestController.add(_apiQueue[i]);
-        }
+        log(result.name);
+        setConnection(result);
+        onConnectionActive();
       },
     );
+  }
+
+  int _recursiveCount = 0;
+
+  Future<void> onConnectionActive() async {
+    if (!isConnected || (_recursiveCount == 10)) return;
+    _recursiveCount += 1;
+    final haveInternet = await checkConnection();
+    if (!haveInternet) return onConnectionActive();
+    for (var i = 0; i < _apiQueue.length; i++) {
+      _requestController.add(_apiQueue[i]);
+    }
   }
 
   Future<bool> checkConnection() async {
     try {
       final result = await InternetAddress.lookup('google.com');
-      if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
-        return true;
-      } else {
-        return false;
-      }
+      final hasAccess = result.isNotEmpty && result[0].rawAddress.isNotEmpty;
+      if (hasAccess) return true;
+      return false;
     } on SocketException catch (_) {
       return false;
-    } catch(e){
+    } catch (e) {
       return false;
     }
   }
 
-  Future<void> setConnection(ConnectivityResult connectivityResult) async {
+  void setConnection(ConnectivityResult connectivityResult) {
     switch (connectivityResult) {
       case ConnectivityResult.wifi:
       case ConnectivityResult.mobile:
       case ConnectivityResult.ethernet:
-        await setIsConnected();
+        isConnected = true;
         break;
       case ConnectivityResult.none:
       case ConnectivityResult.bluetooth:
@@ -120,13 +93,6 @@ class ApiManager {
         isConnected = false;
         break;
     }
-  }
-
-  Future<bool> setIsConnected() async {
-    final connected = await checkConnection();
-    isConnected = connected;
-    if (!connected) await setIsConnected();
-    return connected;
   }
 
   Stream<ApiResponse?> addNewRequest(ApiRequest request) {
@@ -162,6 +128,14 @@ class ApiManager {
     _apiQueue.removeWhere((element) => element.id == request.id);
   }
 
+  void cancelRequest(ApiRequest request) {
+    _apiQueue.remove(request);
+    final controller = _requestResponseMap[request];
+    controller?.close();
+    _requestResponseMap.remove(request);
+  }
+
+
   void close() {
     _requestController.close();
     _connectivitySubscription.cancel();
@@ -170,20 +144,12 @@ class ApiManager {
 
 class ApiRequest {
   final int? id;
-  final String? url;
-  final ApiType apiType;
   final Future Function()? customFutureOperation;
-  final Map<String, dynamic>? body;
-  final Map<String, dynamic>? headers;
   final ApiRequestStatus? status;
 
   ApiRequest({
-    this.url,
-    this.body,
     this.customFutureOperation,
     this.status = ApiRequestStatus.pending,
-    this.apiType = ApiType.post,
-    this.headers,
     this.id,
   });
 
@@ -191,10 +157,6 @@ class ApiRequest {
     return ApiRequest(
       status: status ?? this.status,
       customFutureOperation: customFutureOperation,
-      apiType: apiType,
-      headers: headers,
-      body: body,
-      url: url,
       id: id,
     );
   }
@@ -203,51 +165,16 @@ class ApiRequest {
     return ApiRequest(
       status: status,
       customFutureOperation: customFutureOperation,
-      apiType: apiType,
-      headers: headers,
-      body: body,
-      url: url,
       id: UniqueKey().hashCode,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
-      "url": url,
-      "body": body,
       "customFutureOperation": customFutureOperation,
       "status": status,
-      "apiType": apiType,
-      "headers": headers,
       "id": id,
     };
-  }
-
-  Future<ApiResponse> get() async {
-    try {
-      final response = await http.get(Uri.parse(url ?? ""));
-      final json = tryDecode(response.body);
-      if (response.statusCode == 200 && json != null) {
-        return ApiResponse(
-          data: json,
-          apiStatus: ApiStatus.success,
-        );
-      }
-      return ApiResponse(
-        apiStatus: ApiStatus.error,
-        error: "Something went wrong",
-      );
-    } on TimeoutException catch (_) {
-      return ApiResponse(
-        apiStatus: ApiStatus.error,
-        error: "Timeout!!, please try again later",
-      );
-    } on SocketException catch (_) {
-      return ApiResponse(
-        apiStatus: ApiStatus.notConnected,
-        error: "Not Connected!, please connect to a network",
-      );
-    }
   }
 
   static dynamic tryDecode(data) {
@@ -277,14 +204,6 @@ class ApiResponse {
     this.error,
     this.apiStatus,
   });
-}
-
-enum ApiType {
-  get,
-  post,
-  put,
-  patch,
-  custom,
 }
 
 enum ApiStatus {

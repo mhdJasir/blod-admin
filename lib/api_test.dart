@@ -1,10 +1,8 @@
-import 'dart:isolate';
-import 'dart:ui';
-
-import 'package:blog/helper/api_call_helper.dart';
 import 'package:blog/helper/api_manager.dart';
-import 'package:blog/widgets/overlay_drop_down.dart';
+import 'package:blog/helper/constants.dart';
 import 'package:flutter/material.dart';
+
+import 'helper/api_call_helper.dart';
 
 ValueNotifier<BuildContext?> appContext = ValueNotifier<BuildContext?>(null);
 
@@ -23,11 +21,9 @@ class _ApiTestState extends State<ApiTest> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
-      appContext.value = context;
-    });
   }
 
+  String? error;
   String? day;
   List<String> days = [
     "Monday",
@@ -47,37 +43,45 @@ class _ApiTestState extends State<ApiTest> {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // response?.data == null
-            //     ? Container()
-            //     // : ListView.builder(
-            //     //     itemCount: (response?.data['data'] ?? []).length,
-            //     //     shrinkWrap: true,
-            //     //     itemBuilder: (c, i) {
-            //     //       final map = (response?.data['data'] ?? [])[i];
-            //     //       return buildPlace(map);
-            //     //     },
-            //     //   ),
-            //     : Text(response!.data.toString()),
-            // MaterialButton(
-            //   onPressed: () async {
-            //     final request = ApiRequest(
-            //       apiType: ApiType.custom,
-            //       customFutureOperation: () => ApiCallHelper.getApi(
-            //         path:
-            //             "https://wordsapiv1.p.rapidapi.com/words/hatchback/typeOf",
-            //       ),
-            //     );
-            //
-            //     apiManager.addNewRequest(request).listen((event) {
-            //       if (event != null) {
-            //         response = event;
-            //         setState(() {});
-            //       }
-            //     });
-            //   },
-            //   height: 50,
-            //   child: const Text("Start Call"),
-            // ),
+            error != null
+                ? Text(error!)
+                : response?.data != null
+                    ? (response?.data['data'] == null)
+                        ? Text((response?.data['message'] ?? "").toString())
+                        : ListView.builder(
+                            itemCount: (response?.data['data'] ?? []).length,
+                            shrinkWrap: true,
+                            itemBuilder: (c, i) {
+                              final map = (response?.data['data'] ?? [])[i];
+                              return buildPlace(map);
+                            },
+                          )
+                    : sbh(5),
+            MaterialButton(
+              onPressed: () async {
+                final request = ApiRequest(
+                  customFutureOperation: () => ApiCallHelper.getApi(
+                    path:
+                        "https://wordsapiv1.p.rapidapi.com/words/hatchback/typeOf",
+                  ),
+                );
+
+                apiManager.addNewRequest(request).listen((event) {
+                  if (event == null) return;
+                  if (event.apiStatus == ApiStatus.error) {
+                    error = event.error ?? "";
+                    setState(() {});
+                    return;
+                  }
+                  error = null;
+                  response = event;
+                  setState(() {});
+                  return;
+                });
+              },
+              height: 50,
+              child: const Text("Start Call"),
+            ),
             // response2?.data == null
             //     ? Container()
             //     : ListView.builder(
@@ -88,18 +92,7 @@ class _ApiTestState extends State<ApiTest> {
             //           return buildPlace(map);
             //         },
             //       ),
-            SizedBox(
-              width: 200,
-              child: OverlayDropdown(
-                onChange: (val, index) {
-                  day = val;
-                  setState(() {});
-                },
-                items: days
-                    .map((e) => DropdownItem(value: e, child: Text(e)))
-                    .toList(),
-              ),
-            ),
+            sbh(100),
           ],
         ),
       ),

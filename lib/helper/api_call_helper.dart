@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:developer';
 import 'dart:io';
+
 import 'package:http/http.dart' as http;
 
 class ApiCallHelper {
@@ -22,19 +23,19 @@ class ApiCallHelper {
       var headers = {
         HttpHeaders.contentTypeHeader: 'application/json',
       };
-      print(uri);
-      final response = await http.get(uri, headers: headers);
-      print(response.body);
+      final response = await http.get(uri, headers: headers).timeout(
+            const Duration(seconds: 10),
+          );
       final bool isOnSession = isSessionActive(response);
       if (!isOnSession) {
         return null;
       }
       return tryDecode(response.body);
     } on SocketException catch (_) {
-      print('ApiCallHelper.getApi Socket Exception');
-      rethrow;
+      throw const SocketException("No connection");
+    } on TimeoutException catch (_) {
+      throw TimeoutException("No response from server yet");
     } catch (e) {
-      print("Error   : $e");
       rethrow;
     }
   }
